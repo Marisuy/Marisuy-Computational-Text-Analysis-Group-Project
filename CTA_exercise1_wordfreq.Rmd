@@ -1,7 +1,7 @@
 ---
-title: "CTA_exercise1_wordfreq - with answers"
-author: "Marion Lieutaud & class"
-date: "28/01/2026"
+title: "CTA_exercise1_wordfreq"
+author: "Siyu"
+date: "03/02/2026"
 output: html_document
 ---
 
@@ -52,7 +52,7 @@ The first task, then, is to read in these data. We can do this with the `read_cs
 The `read_csv()` function takes the .csv file and loads it into the working environment as a data frame object called "edbfdata." We can call this object anything though. Try changing the name of the object before the <- arrow. Note that R does not allow names with spaces in, however. It is also not a good idea to name the object something beginning with numbers, as this means you have to call the object within ` marks.
 
 ```{r}
-edbfdata <- read_csv("data/wordfreq/edbookfestall.csv")
+edbfdata <- read_csv( "/Users/aitingrnb/Desktop/social research/computational text analysis/edbookfestall.csv")
 ```
 
 If you're working on this document from your own computer ("locally"), without cloning the Github repo, you can directly download the Edinburgh Fringe data in the following way:
@@ -459,8 +459,76 @@ ggplot(edbf_counts_both, aes(year, sum_wom / year_total, group=genre, color=genr
 
 ```{r}
 # show me
+
+# 1. 准备数据：描述和年份
+evdes_race_analysis <- edbfdata %>%
+  select(description, year)
+# 2.Tokenization
+tidy_des_race <- evdes_race_analysis %>% 
+  mutate(desc = tolower(description)) %>%
+  unnest_tokens(word, desc) %>%
+  filter(str_detect(word, "[a-z]"))
+# 3. 去除无意义的词 (Stop words)
+tidy_des_race <- tidy_des_race %>%
+  filter(!word %in% stop_words$word) %>%
+  filter(!word %in% remove_reg)
+# 4. 计算每年的词频
+edbf_term_counts_race <- tidy_des_race %>% 
+  group_by(year) %>%
+  count(word, sort = TRUE)
+
+# -----------------------------------------------------------------
+# -----------------------------------------------------------------
+# 定义一个新的列叫 'raceword' (种族词)，而不是之前的 'womword'
+# 往这个列表里加词，比如 'hispanic', 'latino' 
+edbf_term_counts_race$raceword <- as.integer(
+  grepl("race|racial|racism|racist|black|white|asian|indigenous|minority|diversity|ethnic|culture", 
+  x = edbf_term_counts_race$word)
+)
+
+# 5. 计算每年种族词汇的占比
+edbf_counts_race_plot <- edbf_term_counts_race %>%
+  group_by(year) %>%
+  mutate(year_total = sum(n)) %>%       # 算出这一年总共有多少个词
+  filter(raceword == 1) %>%             # 只保留刚才被标记为“种族词”的行
+  summarise(sum_race = sum(n),          # 算出种族词的总数
+            year_total = min(year_total)) #分母
+
+ggplot(edbf_counts_race_plot, aes(year, sum_race / year_total, group=1)) +
+  geom_line(color = "darkred", size = 1) + 
+  geom_point(color = "darkred") +          
+  xlab("Year") +
+  ylab("% Race-related words") +           
+  ggtitle("Frequency of Race-related Terms Over Time") +
+  scale_y_continuous(labels = scales::percent_format(),
+                     expand = c(0, 0), limits = c(0, NA)) +
+  theme_tufte(base_family = "Helvetica")
 ```
 
+```{r}
+edbf_term_counts_genre$raceword <- as.integer(
+  grepl("race|racial|racism|racist|black|white|asian|indigenous|minority|diversity|ethnic", 
+  x = edbf_term_counts_genre$word)
+)
+# ---------------------------------------------------------
+# ---------------------------------------------------------
+edbf_counts_race_by_genre <- edbf_term_counts_genre %>%
+  group_by(year, genre) %>% 
+  mutate(year_total = sum(n)) %>%
+  filter(raceword == 1) %>%
+  summarise(sum_race = sum(n),
+            year_total = min(year_total))
+
+# ---------------------------------------------------------
+# ---------------------------------------------------------
+ggplot(edbf_counts_race_by_genre, aes(year, sum_race / year_total, group=genre, color=genre)) + 
+  geom_line() +
+  xlab("Year") +
+  ylab("% Race-related words") +
+  scale_y_continuous(labels = scales::percent_format(),
+                     expand = c(0, 0), limits = c(0, NA)) +
+  theme_tufte(base_family = "Helvetica")
+```
 
 3. Knit your document (click 'Knit' towards the top of your screen) when you've completed your exercise. It should create an html output file. 
 
